@@ -1,0 +1,36 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: morethis
+          POSTGRES_PASSWORD: local_dev_only
+          POSTGRES_DB: morethis
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U morethis -d morethis"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: cp .env.example .env
+      - run: npm run setup:env
+      - run: npm run db:migrate
+      - run: npm run test:setup
+      - run: npm run check
+      - run: npm run test:integration
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
